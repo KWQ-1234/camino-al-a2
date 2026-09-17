@@ -111,7 +111,8 @@ th{text-align:left;font-family:var(--mono);font-size:.74rem;letter-spacing:.04em
 td{padding:7px 12px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
 td:first-child{font-weight:500}
 .ex{display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:start;padding:8px 0;border-bottom:1px solid var(--line)}
-.ex .es{font-weight:500;font-size:1.02rem}.ex .zh{color:var(--muted);font-size:.9rem}
+.ex .es{font-weight:500;font-size:1.02rem}
+.ex .seg{white-space:nowrap}.ex .seg .spk.xs{margin-left:4px;margin-right:6px}.ex .zh{color:var(--muted);font-size:.9rem}
 .ex .bd{font-size:.84rem;color:var(--ink);margin-top:5px;padding:7px 10px;background:var(--surface-2);border-radius:6px;line-height:1.55;max-width:70ch}
 .ex .bd span{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;color:var(--accent);margin-right:8px}
 .vocab{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
@@ -513,6 +514,23 @@ function renderReviewWidget(box,filter){
   };show();
 }
 
+function segments(es){
+  const parts=es.split(/\s+—\s+/);const out=[];
+  parts.forEach(pt=>{const m=pt.match(/[^.?!]+[.?!]+(?:\s|$)|[^.?!]+$/g)||[pt];const ss=m.map(x=>x.trim()).filter(Boolean);if(ss.length>1)out.push(...ss);else out.push(pt.trim())});
+  return out.filter(Boolean);
+}
+function exRow(e,withZh){
+  const r=el("div","ex");const segs=segments(e[0]);
+  const main=el("button","spk","▶");main.title=segs.length>1?"连播整句":"朗读";main.addEventListener("click",ev=>{ev.preventDefault();ev.stopPropagation();segs.length>1?speakAll(segs):speak(e[0])});
+  r.appendChild(main);
+  const box=el("div");const esl=el("div","es");
+  if(segs.length>1){segs.forEach((sg,i)=>{const sp=el("span","seg");sp.textContent=sg;const b=spk(sg);b.classList.add("xs");sp.appendChild(b);esl.appendChild(sp);if(i<segs.length-1)esl.appendChild(document.createTextNode(" "))})}
+  else esl.textContent=e[0];
+  box.appendChild(esl);
+  if(withZh)box.appendChild(el("div","zh",esc(e[1])));
+  if(withZh&&e[2])box.appendChild(el("div","bd",`<span>拆解</span>${esc(e[2])}`));
+  r.appendChild(box);return r;
+}
 function renderExplain(ex,blocks){
   blocks.forEach(b=>{if(b.p)ex.appendChild(el("p",null,md(b.p)));else if(b.tip)ex.appendChild(el("div","tip",md(b.tip)));else if(b.table){const t=el("div","tbl");const tbl=el("table");tbl.innerHTML="<thead><tr>"+b.table.head.map(h=>`<th>${md(h)}</th>`).join("")+"</tr></thead>";const tb=el("tbody");const say=[];
     b.table.rows.forEach(r=>{const tr=el("tr");r.forEach(c=>{const td=el("td",null,md(c));const lat=(b.table.say&&b.table.say[c]!==undefined)?b.table.say[c]:latinPart(c);if(lat){say.push(lat);const bt=spk(lat);bt.classList.add("xs");td.appendChild(bt);const plain=String(c).replace(/\*\*/g,"").replace(/[（(][^）)]*[）)]/g,"").replace(/\s*\/\s*/g,", ").replace(/\s+/g," ").trim().toLowerCase();if(!b.table.hideSay&&lat.toLowerCase()!==plain)td.appendChild(el("div","say","读："+esc(lat)))}tr.appendChild(td)});tb.appendChild(tr)});
@@ -539,7 +557,7 @@ function renderLessonStep(body,id,k){
     }
     const exs=el("div","sec");const st=el("div","sec-title",'<h3>例句</h3><span class="min">2 min</span>');const all=el("button","btn sm","▶ 连播全部");all.addEventListener("click",()=>speakAll(l.examples.map(e=>e[0])));st.appendChild(all);exs.appendChild(st);
     exs.appendChild(el("p","muted","先听一遍，再跟读一遍。重音和语调照着模仿。"));
-    l.examples.forEach(e=>{const r=el("div","ex");r.appendChild(spk(e[0]));r.appendChild(el("div",null,`<div class="es">${esc(e[0])}</div><div class="zh">${esc(e[1])}</div>${e[2]?`<div class="bd"><span>拆解</span>${esc(e[2])}</div>`:""}`));exs.appendChild(r)});
+    l.examples.forEach(e=>exs.appendChild(exRow(e,true)));
     body.appendChild(exs);
     const vs=el("div","sec");vs.appendChild(el("div","sec-title",`<h3>今日词汇 · ${l.vocab.length} 个</h3><span class="min">2 min</span>`));
     vs.appendChild(el("p","muted","名词带着冠词一起记。标记本步完成后，这些词明天进入复习卡；标了「已学」的词在更早的课里出现过，卡片不会重复。"));
@@ -553,7 +571,7 @@ function renderLessonStep(body,id,k){
     body.appendChild(el("div","task-box",`<b>今天的开口任务</b><p style="margin-top:6px">${esc(l.task)}</p>`));
     body.appendChild(el("div","task-box",`<b>听力输入</b><p style="margin-top:6px">${esc(W.listen)}。不查词、不暂停，听懂大意即可。可以在 <a href="#recursos">资源页</a> 找到链接说明。</p>`));
     const sh=el("div","sec");const st=el("div","sec-title","<h3>跟读本课例句</h3>");const all=el("button","btn sm","▶ 连播");all.addEventListener("click",()=>speakAll(l.examples.map(e=>e[0])));st.appendChild(all);sh.appendChild(st);
-    l.examples.forEach(e=>{const r=el("div","ex");r.appendChild(spk(e[0]));r.appendChild(el("div",null,`<div class="es">${esc(e[0])}</div>`));sh.appendChild(r)});body.appendChild(sh);
+    l.examples.forEach(e=>sh.appendChild(exRow(e,false)));body.appendChild(sh);
   }
 }
 function renderExercises(box,list,seedKey){
@@ -581,7 +599,7 @@ function renderSatStep(body,id,k){
     const all=lids.flatMap(lid=>(L[lid]||{examples:[]}).examples);
     const st=el("div","sec-title",`<h3>跟读本周 ${all.length} 句例句</h3><span class="min">8 min</span>`);const b=el("button","btn sm","▶ 连播全部");b.addEventListener("click",()=>speakAll(all.map(e=>e[0])));st.appendChild(b);body.appendChild(st);
     body.appendChild(el("p","muted","连播时滞后半秒跟着说，不看中文。卡住的句子单独点。"));
-    all.forEach(e=>{const r=el("div","ex");r.appendChild(spk(e[0]));r.appendChild(el("div",null,`<div class="es">${esc(e[0])}</div><div class="zh">${esc(e[1])}</div>`));body.appendChild(r)});
+    all.forEach(e=>{const r=exRow(e,true);const bd=r.querySelector(".bd");if(bd)bd.remove();body.appendChild(r)});
     return;
   }
   if(k==="output"){
